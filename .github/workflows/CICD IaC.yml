@@ -71,11 +71,11 @@ jobs:
         path: ${{ github.workspace }}/stacks/bingopizza
       
     # Checks that all Terraform configuration files adhere to a canonical format
-    - name: Terraform Init
-      run: |
-        ls -lha ${{ github.workspace }}/stacks/bingopizza
-        cd ${{ github.workspace }}/stacks/bingopizza
-        terraform init -reconfigure
+   # - name: Terraform Init
+    #  run: |
+    #    ls -lha ${{ github.workspace }}/stacks/bingopizza
+    #    cd ${{ github.workspace }}/stacks/bingopizza
+    #    terraform init -reconfigure
         
     - name: Terraform apply
       run: |
