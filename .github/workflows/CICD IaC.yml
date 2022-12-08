@@ -73,6 +73,7 @@ jobs:
     # Checks that all Terraform configuration files adhere to a canonical format
     - name: Terraform Init
       run: |
+        ls -lha
         cd ${{ github.workspace }}/stacks/bingopizza
         terraform init 
         
