@@ -69,6 +69,9 @@ jobs:
       with:
         name: plano
         path: ${{ github.workspace }}/stacks/bingopizza
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2.0.3
       
     # Checks that all Terraform configuration files adhere to a canonical format
    # - name: Terraform Init
