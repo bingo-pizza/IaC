@@ -29,7 +29,7 @@ jobs:
       run: terraform fmt
 
     # Checks that all Terraform configuration files adhere to a canonical format
-    - name: Terraform Init
+    - name: Terraform Init -reconfigure
       run: |
         cd ${{ github.workspace }}/stacks/bingopizza
         terraform init 
@@ -75,7 +75,7 @@ jobs:
       run: |
         ls -lha ${{ github.workspace }}/stacks/bingopizza
         cd ${{ github.workspace }}/stacks/bingopizza
-        terraform init 
+        terraform init -reconfigure
         
     - name: Terraform apply
       run: |
