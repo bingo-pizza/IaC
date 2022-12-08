@@ -1,7 +1,7 @@
 name: 'Terraform IaC'
 
 on:
-    push
+    pull_request
 
 jobs:
   terraform_CI:
@@ -45,40 +45,7 @@ jobs:
       run: |
         cd ${{ github.workspace }}/stacks/bingopizza
         terraform plan -var-file=../env/dev/dev.tfvars -out=plano.tfplan
-      
-    - name: Upload artifact for deployment jobs
-      uses: actions/upload-artifact@v2
-      with:
-        name: plano
-        path: ${{ github.workspace }}/stacks/bingopizza    
-        
-  terraform_CD:
-    name: 'Terraform_CD'
-    runs-on: ubuntu-latest
-    needs: terraform_CI
-    environment: dev
-
-    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
-    defaults:
-      run:
-        shell: bash
-
-    steps:
-    - name: Download artifact from build job
-      uses: actions/download-artifact@v2
-      with:
-        name: plano
-        path: ${{ github.workspace }}/stacks/bingopizza
-    
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v2.0.3
-      
-    #Checks that all Terraform configuration files adhere to a canonical format
-    - name: Terraform Init
-      run: |
-        ls -lha ${{ github.workspace }}/stacks/bingopizza
-        cd ${{ github.workspace }}/stacks/bingopizza
-        terraform init -reconfigure
+              
         
     - name: Terraform apply
       run: |
