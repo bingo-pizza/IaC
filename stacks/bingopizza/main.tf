@@ -40,4 +40,8 @@ module "app" {
    https_only                         = var.https_only
    scm_type                           = var.scm_type
    always_on                          = var.always_on
+  
+   depends_on = [
+    azurerm_resource_group.rg
+  ]
 }
