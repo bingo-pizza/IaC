@@ -6,8 +6,8 @@ on:
    workflow_dispatch:
 
 jobs:
-  terraform_CI:
-    name: 'Terraform_CI'
+  terraform_CICD:
+    name: 'Terraform_CICD'
     runs-on: ubuntu-latest
     environment: dev
 
