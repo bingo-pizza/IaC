@@ -2,10 +2,10 @@ data "azurerm_resource_group" "app" {
   name = var.resource_group_name
 }
 
-data "azurerm_user_assigned_identity" "assigned_identity_acr_pull" {
- name                = var.identity_name
- resource_group_name = var.resource_group_name_identity
-}
+#data "azurerm_user_assigned_identity" "assigned_identity_acr_pull" {
+# name                = var.identity_name
+# resource_group_name = var.resource_group_name_identity
+#}
 
 resource "azurerm_app_service_plan" "my_service_plan" {
  name                = var.service_plan_name
