@@ -80,4 +80,4 @@ jobs:
     - name: Terraform apply
       run: |
         cd ${{ github.workspace }}/stacks/bingopizza
-        terraform apply -var-file=../env/dev/dev.tfvars plano.tfplan -auto-approve
+        terraform apply "plano.tfplan" 
