@@ -1,7 +1,9 @@
 name: 'Terraform IaC'
 
 on:
-    pull_request
+   schedule: # execute every 12 hours
+    - cron: "* */12 * * *"
+   workflow_dispatch:
 
 jobs:
   terraform_CI:
