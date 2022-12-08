@@ -55,6 +55,7 @@ jobs:
   terraform_CD:
     name: 'Terraform_CD'
     runs-on: ubuntu-latest
+    needs: terraform_CI
     environment: dev
 
     # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
