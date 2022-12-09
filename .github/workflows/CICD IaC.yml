@@ -1,55 +1,165 @@
-name: 'Terraform IaC'
-
+name: 'Terraform CI'
 on:
-   schedule: # execute every 12 hours
-    - cron: "* */12 * * *"
+  push:
+    branches: 
+      - main
+      - development
+
+  pull_request:
+     branches:
+       - main
+       - development
+
    workflow_dispatch:
+     inputs:
+       TFAction:
+         description: "Terraform Action- Apply or Destroy"     
+         required: true
+         default: "apply"
+
+
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+  pull-requests: write
 
 jobs:
-  terraform_CICD:
-    name: 'Terraform_CICD'
+  tf_validate:
+    name: 'Terraform CI'
     runs-on: ubuntu-latest
-    environment: dev
 
-    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
+     
+
+    env:
+      ARM_CLIENT_ID: ${{ secrets.AZURE_AD_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.AZURE_AD_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+      TerraformBackendStorageAccount: ${{ secrets.TF_BACKEND_STORAGE_ACCOUNT }}
+      TerraformBackendResourceGroup: ${{ secrets.TF_BACKEND_RESOURCE_GROUP }}
+      TerraformBackendStorageContainer: ${{ secrets.TF_BACKEND_CONTAINER }}    
+      environmentName: dev     
+      
     defaults:
       run:
         shell: bash
 
     steps:
-    # Checkout the repository to the GitHub Actions runner
     - name: Checkout
       uses: actions/checkout@v3
-
-    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v2.0.3
+      with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
     
-    # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
-    - name: Terraform Format
-      id: fmt
-      run: terraform fmt
+    - name: Replace variables into files terraform
+      uses: "./.github/workflows/template/replace-tokens/"
+      with:
+        ObjectID_SPA_kevault_read: ${{ secrets.AZURE_AD_CLIENT_ID }}
+        ObjectID_SPA_kevault_full: ${{ secrets.AZURE_AD_CLIENT_ID }}
+        clintid_AKS: ${{ secrets.AZURE_AD_CLIENT_ID }}
+        Secret_AKS: ${{ secrets.AZURE_AD_CLIENT_SECRET }}
+        Container_instace: ${{ secrets.ADMINPASSWOR }}
+        Container_arc: ${{secrets.ADMINPASSWOR}}
+        identety: ${{ secrets.AZURE_KEY }}
 
-    # Checks that all Terraform configuration files adhere to a canonical format
-    - name: Terraform Init -reconfigure
+    - name: Terraform Init
       run: |
         cd ${{ github.workspace }}/stacks/bingopizza
-        terraform init 
-    # Generates an execution plan for Terraform
-    - name: Terraform Validate
-      id: validate
-      run: terraform validate -no-color
-
-      # On push to "main", build or change infrastructure according to Terraform configuration files
-      # Note: It is recommended to set up a required "strict" status check in your repository for "Terraform Cloud". See the documentation on "strict" required status checks for more information: https://help.github.com/en/github/administering-a-repository/types-of-required-status-checks
-
+        terraform init -reconfigure -backend-config=storage_account_name=$TerraformBackendStorageAccount -backend-config=container_name=$TerraformBackendStorageContainer -backend-config=key=bingopizza-$environmentName.tfstate -backend-config=resource_group_name=$TerraformBackendResourceGroup -backend-config=subscription_id="$ARM_SUBSCRIPTION_ID" -backend-config=tenant_id="$ARM_TENANT_ID" -backend-config=client_id="$ARM_CLIENT_ID" -backend-config=client_secret="$ARM_CLIENT_SECRET" -reconfigure
+        terraform workspace select $environmentName
     - name: Terraform Plan
       run: |
         cd ${{ github.workspace }}/stacks/bingopizza
-        terraform plan -var-file=../env/dev/dev.tfvars -out=plano.tfplan
-              
+        terraform plan -var-file=../env/$environmentName/$environmentName.tfvars -out=bingopizza.tfplan
         
-    - name: Terraform apply
+    - name: Terraform fmt
       run: |
         cd ${{ github.workspace }}/stacks/bingopizza
-        terraform apply "plano.tfplan" 
+        terraform show -no-color -json bingopizza.tfplan > bingopizza.json
+    - name: Setup Infracost
+      run: |
+        sudo apt-get update -qq && sudo apt-get -qq install bc curl git
+        curl -sL https://github.com/infracost/infracost/releases/latest/download/infracost-linux-amd64.tar.gz | tar xz -C /tmp
+        sudo mv /tmp/infracost-linux-amd64 /usr/bin/infracost
+        curl -sL -o infracost_diff.sh https://raw.githubusercontent.com/infracost/infracost/master/scripts/ci/diff.sh
+        chmod +x infracost_diff.sh
+        #./infracost_diff.sh
+        infracost breakdown --no-color --path ${{ github.workspace }}/stacks/bingopizza/bingopizza.json
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken) # Do not change this, it's used to post comments
+        INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+        ARM_CLIENT_ID: ${{ secrets.AZURE_AD_CLIENT_ID }}
+        ARM_CLIENT_SECRET: ${{ secrets.AZURE_AD_CLIENT_SECRET }}
+        ARM_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+        path: ${{ github.workspace }}/stacks/bingopizza/bingopizza.json
+
+    - uses: actions/upload-artifact@v2
+      name: gerando artefato
+      with:
+        name: _drop
+        path: ${{ github.workspace }}/stacks/bingopizza/bingopizza.json
+
+    - name: Adiconando terraform plan ao pull request
+      uses: actions/github-script@v6
+      if: github.event_name == 'pull_request'
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const fs = require("fs");
+          const plan = fs.readFileSync("${{ github.workspace }}/stacks/bingopizza/bingopizza.json", "utf8");
+          const maxGitHubBodyCharacters = 65536;
+          function chunkSubstr(str, size) {
+            const numChunks = Math.ceil(str.length / size)
+            const chunks = new Array(numChunks)
+            for (let i = 0, o = 0; i < numChunks; ++i, o += size) {
+              chunks[i] = str.substr(o, size)
+            }
+            return chunks
+          }
+          // Split the Terraform plan into chunks if it's too big and can't fit into the GitHub Action
+          var plans = chunkSubstr(plan, maxGitHubBodyCharacters); 
+          for (let i = 0; i < plans.length; i++) {
+            const output = `### ${{ inputs.plan-title }} Part # ${i + 1}
+            #### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+            #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
+            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+            <details><summary>Show Plan</summary>
+            \`\`\`\n
+            ${plans[i]}
+            \`\`\`
+            </details>
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ inputs.working-directory }}\`, Workflow: \`${{ github.workflow }}\`*`;   
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+          }
+  terraform_apply:
+    if: github.event_name == 'pull_request'
+    name: 'Terraform apply'
+    needs: [tf_validate]
+    runs-on: ubuntu-latest
+    environment: dev
+    
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - uses: actions/download-artifact@v2
+      name: downlaod artifact
+      with:
+        name: _drop
+        path: cd ${{ github.workspace }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2.0.3
+    
+    - name: terraform Apply
+      run: |
+        cd ${{ github.workspace }}
+        terraform apply bingopizza.json -auto-approve
